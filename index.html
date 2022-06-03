@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta charset="utf-8">
+		<meta name="viewport" content="width=device-width, initial-scale=1">
+		<title>ARSWP</title>
+		<link rel="stylesheet" type="text/css" href="loader.css">
+	</head>
+	<script type="text/javascript">
+		const data = {
+			"D": {
+				"Maria": {
+					"Room" : [0, 0.3333],
+					"Street" : [0.3333, 0.6667],
+					"SchoolEnterance" : [0.6667, 1]
+				}
+			},
+			"N": {
+				"Maria": {
+					"Room" : [0, 0.1],
+					"House" : [0.1, 0.2],
+					"Street" : [0.2, 0.7],
+					"Server" : [0.7, 0.85],
+					"ServerClose" : [0.85, 1]
+				},
+				"Marina": {
+					"Street" : [0, 0.5],
+					"Park" : [0.5, 1]
+				}
+			}
+		}
+		const translate_data = {
+			"Maria": {
+				"DN": {
+					"Room": "Room",
+					"SchoolEnterance": "Server",
+					"Street": "Street"
+				},
+				"ND": {
+					"Room": "Room",
+					"House" : "Room",
+					"Street": "Street",
+					"Server": "SchoolEnterance",
+					"ServerClose": "SchoolEnterance"
+				}
+			}
+		}
+
+		var main_state = {
+			current_character: "Maria",
+			Maria_location: "ServerClose",
+			Marina_location: "Street",
+			Maria_direction: 1,
+			Marina_direction: 0,
+			Maria_position: 1,
+			Marina_position: 0,
+			time: "N"
+		}
+
+		var prediction_state = {
+			current_character: "Maria",
+			Maria_location: "ServerClose",
+			Marina_location: "Street",
+			Maria_direction: 1,
+			Marina_direction: 0,
+			Maria_position: 1,
+			Marina_position: 0,
+			time: "N"
+		}
+
+		function get_time() {
+			let x = (new Date()).getHours();
+			return (x < 4) || (x > 15) ? "N" : "D";
+		}
+
+		function get_location(time, character, point) {
+			for (let name in data[time][character]) {
+				let area = data[time][character][name]
+				if ((area[0] <= point) && (point <= area[1]))
+					return name;
+			}
+		}
+
+		function get_point(time, character, location) {
+			let bounds = data[time][character][location];
+			return (bounds[0] + bounds[1]) / 2;
+		}
+
+		function translate_location(character, times, location) {
+			return translate_data[character][times][location];
+		}
+
+		function update_character() {
+			if ((get_time() == "N") && (Math.random() >= 0.5)) return "Marina";
+			else return "Maria";
+		}
+
+		function update_direction(time, character) {
+			let rpick = data[time][character];
+			let keys = Object.keys(rpick);
+			rpick = rpick[keys[Math.floor(Math.random() * keys.length)]];
+			return (rpick[0] + rpick[1]) / 2;
+		}
+
+		function update_position(position, direction) {
+			if (position == direction) return position;
+			position += Math.sign(direction - position) / ((get_time() == "N") ? 100 : 10);
+			position = Math.round(Math.min(Math.max(0, position), 1) * 256) / 256;
+			return position;
+		}
+
+		function update_all(state) {
+			let character = update_character();
+			let time = get_time();
+			if (time != state.time)
+				state.Maria_position = get_point(time, "Maria", translate_location(
+					"Maria",
+					state.time + time,
+					state.Maria_location
+				));
+			let position = state[character + "_position"]
+			let target_location = get_location(time, character, state[character + "_direction"])
+			let current_location = state[character + "_location"]
+			let direction = (target_location == current_location) ?
+				update_direction(time, character) :
+				state[character + "_direction"];
+			position = update_position(
+				position,
+				direction
+			);
+
+			state[character + "_position"] = position;
+			state[character + "_direction"] = direction;
+			state[character + "_location"] = get_location(time, character, position);
+			state.time = time;
+			state.current_character = character;
+		}
+
+		function update_file(state) {
+			return `${state.current_character}_${state.time}_${state[state.current_character + '_location']}.mp4`
+		}
+
+		function copy_state(source, destination) {
+			destination.current_character = source.current_character
+			destination.Maria_location = source.Maria_location
+			destination.Marina_location = source.Marina_location
+			destination.Maria_direction = source.Maria_direction
+			destination.Marina_direction = source.Marina_direction
+			destination.Maria_position = source.Maria_position
+			destination.Marina_position = source.Marina_position
+			destination.time = source.time
+		}
+	</script>
+	<body style="margin: 0; overflow-y: hidden">
+		<loader style="z-index: 9; position: fixed; background: #fff; width: 100vw; height: 100vh;"></loader>
+		<video muted autoplay src="Maria_ServerClose.mp4" width="1920" height="1080" id="main"></video>
+	</body>
+	<script type="text/javascript">
+		var video = document.getElementById('main')
+		video.updating = false;
+		update_all(prediction_state);
+
+		function setup() {
+			setTimeout(() => {
+				if (video.updating || isNaN(video.duration)) return;
+				video.updating = true;
+				video.play();
+				copy_state(prediction_state, main_state);
+				let file = video.src;
+				let file_new = update_file(main_state);
+				if (file != file_new) change_animation(get_time()=="N"?"#000":"#fff", file_new)
+				update_all(prediction_state);
+				setup()
+			}, (video.duration - video.currentTime - 2) * 200)
+			console.log((video.duration - video.currentTime - 2))
+		}
+	</script>
+	<script type="text/javascript" src="loader.js"></script>
+	<script type="text/javascript">
+		var hidden, visibilityChange; 
+		if (typeof document.hidden !== "undefined") {  
+			hidden = "hidden";
+			visibilityChange = "visibilitychange";
+		} else if (typeof document.msHidden !== "undefined") {
+			hidden = "msHidden";
+			visibilityChange = "msvisibilitychange";
+		} else if (typeof document.webkitHidden !== "undefined") {
+			hidden = "webkitHidden";
+			visibilityChange = "webkitvisibilitychange";
+		}
+
+		var videoElement = document.getElementById("videoElement");
+
+		function handleVisibilityChange() {
+			if (document[hidden] && videoElement.style.display != 'none') {
+				videoElement.play();
+			}
+		}
+
+		if (typeof document.addEventListener === "undefined" || hidden === undefined) {
+			console.log("This demo requires a browser, such as Google Chrome or Firefox, that supports the Page Visibility API.");
+		} else {
+			// Handle page visibility change   
+			document.addEventListener(visibilityChange, handleVisibilityChange, false);
+		}
+	</script>
+</html>

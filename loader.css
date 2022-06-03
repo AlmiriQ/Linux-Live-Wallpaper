@@ -1,0 +1,27 @@
+loader.loading {
+	z-index: 9;
+	position: absolute;
+	background: #fff;
+	width: 100vw;
+	height: 100vh;
+}
+
+@keyframes
+removing {
+	from {
+		opacity: 100%;
+	}
+	to {
+		opacity: 0%;
+	}
+}
+
+@keyframes
+showing {
+	from {
+		opacity: 0%;
+	}
+	to {
+		opacity: 100%;
+	}
+}
